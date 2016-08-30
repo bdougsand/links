@@ -19,9 +19,9 @@
                  [org.apache.tika/tika-parsers "1.13"]]
   :plugins [[lein-ring "0.9.7"]]
   :main links.system
-  :aot :all
   :ring {:handler links.handler/app}
   :profiles
   {:dev {:dependencies [[javax.servlet/servlet-api "2.5"]
-                        [ring/ring-mock "0.3.0"]]}})
+                        [ring/ring-mock "0.3.0"]]}
+   :uberjar {:aot :all}})
 
