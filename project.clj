@@ -19,6 +19,7 @@
                  [enlive "1.1.6"]]
   :plugins [[lein-ring "0.9.7"]]
   :main links.system
+  :aot :all
   :ring {:handler links.handler/app}
   :profiles
   {:dev {:dependencies [[javax.servlet/servlet-api "2.5"]

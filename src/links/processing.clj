@@ -15,13 +15,19 @@
 
 (def meta-tags
   {"author" :author
+   "keywords" :keywords
    "og:author" :author
    "og:image" :image
    "og:video" :video
+   "og:video:width" :video-width
+   "og:video:height" :video-height
+   "og:video:type" :video-type
    "og:type" :type
    "og:description" :description
    "og:site_name" :site-name
    "twitter:creator" :twitter-handle})
+
+;; TODO: Check for oEmbed 
 
 (defn process-body [body-string]
   (let [body (to-node body-string)]
@@ -61,8 +67,10 @@
     (catch Exception err
       (println ";; Error during processing" (prn-str err)))))
 
-(defonce in-chan (async/chan 50))
-(defonce out-chan (async/chan 50))
+;; TODO: Set this up to start when the system starts
+(defonce in-chan (async/chan (async/dropping-buffer 50)))
+(defonce out-chan (async/chan (async/dropping-buffer 50)))
+
 
 (async/pipeline 10 out-chan (map process-url) in-chan)
 

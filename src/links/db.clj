@@ -11,6 +11,8 @@
   (:import [org.bson.types ObjectId]
            [java.net URL]))
 
+(defn get-db [] (-> (mg/connect) (mg/get-db "links-dev")))
+
 (def gen (java.util.Random.))
 
 (def chars "ol23456789abcdefghijkmnpqrstvwxyz")
@@ -24,15 +26,29 @@
 
       s)))
 
+(defn make-filter
+  "Transforms a map of values into a transducer that filters out maps whose
+  :data entries do not match."
+  [opts]
+  (reduce comp (map (fn [[k v]]
+                      (filter #(= (get-in % [:data k]) v)))
+                    opts)))
+
+(defn get-list-raw [db list-key & [opts]]
+  (when-let [link-list (mc/find-one-as-map db "links" {:key list-key})]
+    (cond-> link-list
+      opts (update :links (partial into [] (make-filter opts))))))
+
 (defn get-list [db list-key]
-  (let [link-list (mc/find-one-as-map db "links" {:key list-key})
-        links (:links link-list)
-        urls (mc/find-maps db "url-info" {:url {$in (map :url links)}})
-        url-map (into {} (map (juxt :url identity)) urls)]
-    (assoc link-list
-           :links (map (fn [link-info]
-                         (merge link-info (url-map (:url link-info))))
-                       links))))
+  (when-let [link-list (mc/find-one-as-map db "links" {:key list-key})]
+    (let [links (:links link-list)
+          urls (mc/find-maps db "url-info" {:url {$in (map :url links)}})
+          url-map (into {} (map (juxt :url identity)) urls)]
+      (assoc link-list
+             :links (->> links
+                         (reverse)
+                         (map (fn [link-info]
+                                   (merge link-info (url-map (:url link-info))))))))))
 
 (defn add-to-list [db list-key link-info]
   (proc/process (:url link-info))

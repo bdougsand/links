@@ -1,9 +1,44 @@
 (ns links.views
   (:require [hiccup.core :refer [html]]
-            [clojure.string :as str]))
+            [clojure.string :as str])
+  (:import [java.time.Duration]))
 
 (def date-format
   (java.text.SimpleDateFormat. "hh:mm aa 'on' MMM dd, yyyy"))
+
+(defn pluralize [n w]
+  (if (= n 1)
+    (str "a " w)
+    (str n " " w "s")))
+
+(defn format-since [diff]
+  (let [diff (/ diff 1000)
+        m (-> diff (mod 3600) (/ 60) (int))
+        h (int (/ diff 3600))]
+    (cond
+      (< diff 60) "less than a minute ago"
+
+      (> h 0) (str h " hour" (when-not (= h 1) "s")
+                   (when-not (zero? m)
+                     (str ", " (pluralize m "minute")))
+                   " ago")
+
+      :else (str (pluralize m "minute") " ago")
+
+      (zero? h) (str m " minutes ago"))))
+
+(defn format-recent [diff]
+  (let [d (int (/ diff (* 3600 1000 24)))]
+    (str (pluralize d "day") " ago")))
+
+(defn format-date [dt]
+  (let [diff (- (inst-ms (java.util.Date.)) (inst-ms dt))]
+    (cond
+      (< diff 86400000) (format-since diff)
+
+      (< diff (* 3600000 72)) (format-recent diff)
+
+      :else (.format date-format dt))))
 
 (defn layout [{:keys [title]} & body]
   (html [:html {:lang "en"}
@@ -25,26 +60,40 @@
 
 (defmulti render-datum-type key)
 (defmethod render-datum-type :default [[k v]]
-  [:div [:strong (str (readable-key k (name k)) " — ")] v])
+  [:div [:strong (readable-key k (name k))] " — " v])
 
 (defn render-datum [pair]
   [:li (render-datum-type pair)])
 
+(defn title-from-url [url]
+  (try
+    (-> url
+        (java.net.URL.)
+        (.getHost))
+    (catch Exception _
+      "Untitled")))
+
 (defn render-link [{:keys [title url added data description image
-                           site-name video twitter-handle]}]
-  [:div.row [:div.col-md-3
-             (when image [:span.thumbnail [:img {:src image}]])]
-   [:div.col-md-9
-    [:a {:href url} [:h3.title (or title url)]]
+                           site-name video twitter-handle type]}]
+  [:div.row [:div.col-md-3.col-xs-6
+             [:span.thumbnail
+              [:img.img-thumbnail
+               {:src (or image "https://placeholdit.imgix.net/~text?w=200&h=225")}]]]
+   [:div.col-md-9.col-xs-6
+    [:a {:href url} [:h3.title (or title (title-from-url url))
+                     (when type
+                       (cond
+                         (re-find #"^video" type) [:span.glyphicon.glyphicon-facetime-video]
+                         (re-find #"image" type) [:span.glyphicon.glyphicon-picture]))]]
     [:div
      (when site-name
-       [:span.text-muted.glyphicon.glyphicon-globe site-name])
+       [:span [:span.text-muted.glyphicon.glyphicon-be] site-name])
      (when (and site-name twitter-handle) " — ")
      (when twitter-handle
        [:a {:href (str "https://twitter.com/" (subs twitter-handle 1))}
         twitter-handle])]
     [:em.small.text-muted url]
-    (when added [:div (str "Posted " (.format date-format added))])
+    (when added [:div (str "Posted " (format-date added))])
     (when description [:p description])
     [:ul (map render-datum data)]]])
 
@@ -54,5 +103,5 @@
            (map render-link (:links list-info))]))
 
 (defn not-found-view [list-key]
-  (layout [:p "Could not find list:" list-key]))
+  (layout {:title "List not found"} [:p "Could not find list:" list-key]))
 
