@@ -81,6 +81,7 @@
                {:src (or image "https://placeholdit.imgix.net/~text?w=200&h=225")}]]]
    [:div.col-md-9.col-xs-6
     [:a {:href url} [:h3.title (or title (title-from-url url))
+                     "  "
                      (when type
                        (cond
                          (re-find #"^video" type) [:span.glyphicon.glyphicon-facetime-video]

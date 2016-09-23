@@ -10,13 +10,13 @@
                  [environ "1.0.3"]
                  [selmer "1.0.7"]
 
-                 [org.jsoup/jsoup "1.8.3"]
                  [org.clojure/data.json "0.2.6"]
                  [hiccup "1.0.5"]
                  [liberator "0.14.1"]
                  [com.novemberain/monger "3.0.2"]
                  [org.clojure/core.async "0.2.391"]
-                 [enlive "1.1.6"]]
+                 [enlive "1.1.6"]
+                 [org.apache.tika/tika-parsers "1.13"]]
   :plugins [[lein-ring "0.9.7"]]
   :main links.system
   :aot :all
