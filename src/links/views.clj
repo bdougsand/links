@@ -6,6 +6,9 @@
 (def date-format
   (java.text.SimpleDateFormat. "hh:mm aa 'on' MMM dd, yyyy"))
 
+(defn format-default [dt]
+  (.format date-format dt))
+
 (defn pluralize [n w]
   (if (= n 1)
     (str "a " w)
@@ -38,7 +41,7 @@
 
       (< diff (* 3600000 72)) (format-recent diff)
 
-      :else (.format date-format dt))))
+      :else (format-default dt))))
 
 (defn layout [{:keys [title]} & body]
   (html [:html {:lang "en"}
@@ -73,7 +76,7 @@
     (catch Exception _
       "Untitled")))
 
-(defn render-link [{:keys [title url added data description image
+(defn render-link [{:keys [title author url added created data description image
                            site-name video twitter-handle type]}]
   [:div.row [:div.col-md-3.col-xs-6
              [:span.thumbnail
@@ -87,14 +90,17 @@
                          (re-find #"^video" type) [:span.glyphicon.glyphicon-facetime-video]
                          (re-find #"image" type) [:span.glyphicon.glyphicon-picture]))]]
     [:div
+     (when author
+       [:span "By " [:strong author] (when site-name ", ")])
      (when site-name
-       [:span [:span.text-muted.glyphicon.glyphicon-be] site-name])
+       [:span [:span.text-muted.glyphicon.glyphicon-globe] " " site-name])
      (when (and site-name twitter-handle) " — ")
      (when twitter-handle
        [:a {:href (str "https://twitter.com/" (subs twitter-handle 1))}
         twitter-handle])]
     [:em.small.text-muted url]
-    (when added [:div (str "Posted " (format-date added))])
+    (when created [:div (str "Created " )])
+    (when added [:div (str "Linked " (format-date added))])
     (when description [:p description])
     [:ul (map render-datum data)]]])
 

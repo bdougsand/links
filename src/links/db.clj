@@ -1,17 +1,20 @@
 (ns links.db
-  (:require [monger.collection :as mc]
+  (:require [environ.core :refer [env]]
+            [monger.collection :as mc]
             [monger.core :as mg]
             [monger.operators :refer [$in $pull $push]]
             [monger.query :as mq]
             [monger.result :as mr]
 
-            [links.processing :as proc]
+            [links.processing :as pr]
 
             [clojure.core.async :as async])
   (:import [org.bson.types ObjectId]
            [java.net URL]))
 
-(defn get-db [] (-> (mg/connect) (mg/get-db "links-dev")))
+
+(defn get-db []
+  (-> (mg/connect) (mg/get-db (env :mongo-db "links-dev"))))
 
 (def gen (java.util.Random.))
 
@@ -51,7 +54,7 @@
                                    (merge link-info (url-map (:url link-info))))))))))
 
 (defn add-to-list [db list-key link-info]
-  (proc/process (:url link-info))
+  (pr/process (:url link-info))
   (let [result (mc/update db "links"
                           {:key list-key}
                           {$push {:links link-info}})]
@@ -67,7 +70,8 @@
 
 (defn start-save-loop [db]
   (async/go-loop []
-    (mc/insert db "url-info" (async/<! proc/out-chan))
+    (let [info (async/<! pr/out-chan)]
+      (mc/upsert db "url-info" {:url (:url info)} info))
     (recur)))
 
 (defn stop-loop [chan]
