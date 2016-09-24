@@ -9,6 +9,7 @@
            org.apache.tika.parser.AutoDetectParser
            org.xml.sax.helpers.DefaultHandler))
 
+
 (defn metadata-map [meta-data]
   (into {} (map (fn [n] [n (.get meta-data n)])) (.names meta-data)))
 
@@ -30,8 +31,6 @@
             handler
             meta-data)
     meta-data))
-
-
 
 (defn to-node [html]
   (-> html
@@ -59,6 +58,8 @@
    "article:author" :author
    "twitter:creator" :twitter-handle})
 
+(def link-tags {})
+
 ;; Processing other types of documents
 (def shared-tags
   {"author" :author
@@ -77,11 +78,18 @@
 
 ;; TODO: Check for oEmbed
 
-(defn process-body [body-string]
-  (let [body (to-node body-string)]
+(defn do-print [x]
+  (println x)
+  x)
+
+(defn process-body [response]
+  (let [body (-> response :body to-node)]
     (merge
      {:title (-> body (html/select [:title]) to-text)
-      :image (-> body (html/select [:img]) (first) :attrs :src)}
+      :image (when-let [src (-> body (html/select [:img]) first :attrs :src)]
+               (.. (java.net.URI. (-> response :opts :url))
+                   (resolve src)
+                   (toString)))}
 
      ;; Build up a map of attributes from the meta tags:
      (into {} (keep (fn [{{p :property, n :name, c :content} :attrs}]
@@ -97,11 +105,16 @@
    "image/png" ::png
    "application/pdf" ::pdf
    "application/vnd.ms-excel" ::excel
+   "application/vnd.ms-word" ::word
    "application/vnd.ms-powerpoint" ::ppt})
 
 (derive ::jpeg ::image)
 (derive ::gif ::image)
 (derive ::png ::image)
+
+(derive ::excel ::msoffice)
+(derive ::ppt ::msoffice)
+(derive ::word ::msoffice)
 
 (defn content-type [response]
   (let [[ctype params] (-> response
@@ -114,12 +127,12 @@
 (defmethod process-document :default [_] nil)
 
 (defmethod process-document ::html [response]
-  (process-body (:body response)))
+  (process-body response))
 
 (defmethod process-document ::pdf [response]
   (meta-map (get-metadata response) pdf-tags))
 
-(defmethod process-document ::excel [response]
+(defmethod process-document ::msoffice [response]
   (meta-map (get-metadata response) xls-tags))
 
 (defmethod process-document ::ppt [response]
@@ -136,14 +149,12 @@
 
       (let [content-type (:content-type headers)]
         (merge {:url url
-                :content-type content-type
+                :content-type (name content-type)
                 :modified (:last-modified headers)
                 :size (when-let [size (:content-length headers)]
                         (Long/parseLong size))}
 
                (process-document response))))))
-
-(defn do-print [x] (println x) x)
 
 (defn process-url [url]
    (println ";; Processing" url)
@@ -158,7 +169,8 @@
 (defonce out-chan (async/chan (async/dropping-buffer 50)))
 
 
-(async/pipeline 10 out-chan (map process-url) in-chan)
+(defonce processing-pipeline
+  (async/pipeline 10 out-chan (map process-url) in-chan))
 
 (defn process [url]
   (async/put! in-chan url))
